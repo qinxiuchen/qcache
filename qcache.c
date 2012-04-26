@@ -33,6 +33,8 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <time.h>
+#include <sys/stat.h>
 
 #include "php_qcache.h"
 #include "frozenarray.h"
@@ -56,6 +58,8 @@ typedef int (*qcache_walk_dir_cb)(const char* filename, void* ctxt TSRMLS_DC);
  */
 //static HashTable *qcache_data_hash = NULL;
 static HashTable *qcache_data_hash_temp = NULL;
+//文件夹上次被修改的最新时间
+static time_t lmt = NULL;
 //static HashTable *qcache_data_hash_temp1 = NULL;
 //static int qcache_data_shmid;
 /* }}} */
@@ -265,6 +269,22 @@ static int qcache_load_data(const char *data_file, void* pctxt TSRMLS_DC)
 				zend_error(E_ERROR, "Unable to add %s to the qcache data hash", data_file);
 				return 0;
 			}
+			//修改时间
+			const char *data_path = NULL;
+
+			if(QCACHE_G(data_path)) 
+			{
+				data_path = QCACHE_G(data_path);
+			}
+			//获取该文件夹的状态信息，主要是最近修改时间
+			struct stat statBuf;
+			if (stat(data_path, &statBuf))
+			{
+				zend_error(E_ERROR, "can't stat file %s", data_path);
+				return NULL;
+			}
+			lmt = statBuf.st_mtime;
+			
 			return 1;
 		}
 	}
@@ -366,16 +386,7 @@ PHP_MSHUTDOWN_FUNCTION(qcache)
 
 	if(IS_ALLOC_THREAD())
 	{
-		/** Prevent multiple-free() calls of the same data.
-		 * If free() is called on data items in each process, the 
-		 * addition of that item to the libc internal free list, 
-		 * results in new Copy-on-Write pages being spawned,
-		 * increasing the memory-use. So it's counter-productive
-		 * to cleanup in child processes.
-		 */
-//		zend_hash_destroy(qcache_data_hash);
 
-//		pefree(qcache_data_hash, 1);
 	}
 
 #ifdef ZTS
@@ -392,7 +403,28 @@ PHP_MSHUTDOWN_FUNCTION(qcache)
 /* {{{ PHP_RINIT_FUNCTION(qcache) */
 PHP_RINIT_FUNCTION(qcache)
 {
-//	qcache_data_hash_temp1 = (HashTable *)shmat(qcache_data_shmid,NULL,0);
+	//首先获取数据文件夹的相关目录
+	const char *data_path = NULL;
+
+	if(QCACHE_G(data_path)) 
+	{
+		data_path = QCACHE_G(data_path);
+	}
+	//获取该文件夹的状态信息，主要是最近修改时间
+	struct stat statBuf;
+	if (stat(data_path, &statBuf))
+	{
+		zend_error(E_ERROR, "can't stat file %s", data_path);
+		return NULL;
+	}
+	time_t cur_lmt = statBuf.st_mtime;
+	double dif = cur_lmt - lmt;
+	if(dif > 0){
+		qcache_parser_ctxt ctxt = {0,};
+		//zend_hash_destroy(qcache_data_hash);
+		//重新加载数据到qcache_data_hash
+		qcache_read_data(&ctxt TSRMLS_CC);
+	}
 	return SUCCESS;
 }
 /* }}} */
@@ -520,7 +552,7 @@ PHP_FUNCTION(qcache_fetch_child)
 	if (child_name && zend_hash_find(Z_ARRVAL_P(src), child_name, child_name_len + 1, (void**)&zvalue) == FAILURE) {
 		RETURN_NULL();
   }
-	*return_value = **hentry;
+	*return_value = **zvalue;
   zval_copy_ctor(return_value);
 }
 
