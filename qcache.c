@@ -12,11 +12,10 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Authors: Gopal Vijayaraghavan <gopalv@php.net>                       |
+  | Authors: qxc <qinxiuchen@gmail.com>                       |
   +----------------------------------------------------------------------+
 */
 
-/* $Id: qcache.c 321331 2011-12-22 13:11:56Z gopalv $ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
