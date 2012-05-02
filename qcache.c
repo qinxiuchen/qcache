@@ -108,14 +108,12 @@ PHP_INI_END()
 QCACHE_ARGINFO_STATIC
 ZEND_BEGIN_ARG_INFO(php_qcache_fetch_arginfo, 0)
     ZEND_ARG_INFO(0, key)
-    ZEND_ARG_INFO(0, thaw)
 ZEND_END_ARG_INFO()
 
 QCACHE_ARGINFO_STATIC
 ZEND_BEGIN_ARG_INFO(php_qcache_fetch_child_arginfo, 0)
     ZEND_ARG_INFO(0, parent_name)
     ZEND_ARG_INFO(0, child_name)
-    ZEND_ARG_INFO(0, thaw)
 ZEND_END_ARG_INFO()
 
 QCACHE_ARGINFO_STATIC
@@ -504,7 +502,7 @@ PHP_MINFO_FUNCTION(qcache)
 }
 /* }}} */
 
-/* {{{ proto mixed qcache_fetch(string key [, bool thaw])
+/* {{{ proto mixed qcache_fetch(string key)
  */
 PHP_FUNCTION(qcache_fetch) 
 {
@@ -512,9 +510,8 @@ PHP_FUNCTION(qcache_fetch)
 	zval *wrapped;
 	char *strkey;
 	int strkey_len;
-	zend_bool thaw = 0;
 
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &strkey, &strkey_len, &thaw) == FAILURE)
+	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &strkey, &strkey_len) == FAILURE)
 	{
 		return;
 	}
@@ -524,19 +521,12 @@ PHP_FUNCTION(qcache_fetch)
 		return;
 	}
 
-	if(thaw)
-	{
-		wrapped = frozen_array_copy_zval_ptr(NULL, hentry[0], 0, NULL TSRMLS_CC);
-	}
-	else
-	{
-		wrapped = frozen_array_wrap_zval(hentry[0] TSRMLS_CC);
-	}
+	wrapped = frozen_array_copy_zval_ptr(NULL, hentry[0], 0, NULL TSRMLS_CC);
 
 	RETURN_ZVAL(wrapped, 0, 1);
 }
 
-/* {{{ proto mixed qcache_fetch_child(string parent_name, string child_name [, bool thaw])
+/* {{{ proto mixed qcache_fetch_child(string parent_name, string child_name)
  */
 PHP_FUNCTION(qcache_fetch_child) 
 {
@@ -548,9 +538,8 @@ PHP_FUNCTION(qcache_fetch_child)
 	int parent_name_len;
 	char *child_name;
 	int child_name_len;
-	zend_bool thaw = 0;
 
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|s|b", &parent_name, &parent_name_len, &child_name, &child_name_len, &thaw) == FAILURE)
+	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|s", &parent_name, &parent_name_len, &child_name, &child_name_len) == FAILURE)
 	{
 		RETURN_NULL();
 	}
