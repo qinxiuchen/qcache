@@ -38,6 +38,7 @@
 
 #include "php_qcache.h"
 #include "frozenarray.h"
+#include <stdbool.h>
 
 typedef int (*qcache_walk_dir_cb)(const char* filename, void* ctxt TSRMLS_DC);
 
@@ -58,7 +59,7 @@ typedef int (*qcache_walk_dir_cb)(const char* filename, void* ctxt TSRMLS_DC);
  */
 //static HashTable *qcache_data_hash = NULL;
 static HashTable *qcache_data_hash_temp = NULL;
-//ÎÄ¼þ¼ÐÉÏ´Î±»ÐÞ¸ÄµÄ×îÐÂÊ±¼ä
+//æ–‡ä»¶å¤¹ä¸Šæ¬¡è¢«ä¿®æ”¹çš„æœ€æ–°æ—¶é—´
 static time_t lmt = NULL;
 //static HashTable *qcache_data_hash_temp1 = NULL;
 //static int qcache_data_shmid;
@@ -174,8 +175,20 @@ static void qcache_zval_pfree(void *p)
 	frozen_array_free_zval_ptr((zval**)p, 1 TSRMLS_CC);
 }
 /* }}} */
-
-
+/*åˆ¤æ–­ä¸€ä¸ªå­—ç¬¦ä¸²æ˜¯å¦ä¸ºæ•´æ•°*/
+static bool checkInt(char* p){
+    int len = strlen(p);
+    bool result = true;
+    while(len > 0){
+        if(*p < '0' || *p > '9'){
+            result = false;
+            break;
+        }
+        p++;
+        len--;
+    }
+    return result;
+}
 /* {{{ qcache_walk_dir */
 static int qcache_walk_dir(const char *path, const char *ext, qcache_walk_dir_cb cb, void *ctxt TSRMLS_DC)
 {
@@ -269,14 +282,14 @@ static int qcache_load_data(const char *data_file, void* pctxt TSRMLS_DC)
 				zend_error(E_ERROR, "Unable to add %s to the qcache data hash", data_file);
 				return 0;
 			}
-			//ÐÞ¸ÄÊ±¼ä
+			//ä¿®æ”¹æ—¶é—´
 			const char *data_path = NULL;
 
 			if(QCACHE_G(data_path)) 
 			{
 				data_path = QCACHE_G(data_path);
 			}
-			//»ñÈ¡¸ÃÎÄ¼þ¼ÐµÄ×´Ì¬ÐÅÏ¢£¬Ö÷ÒªÊÇ×î½üÐÞ¸ÄÊ±¼ä
+			//èŽ·å–è¯¥æ–‡ä»¶å¤¹çš„çŠ¶æ€ä¿¡æ¯ï¼Œä¸»è¦æ˜¯æœ€è¿‘ä¿®æ”¹æ—¶é—´
 			struct stat statBuf;
 			if (stat(data_path, &statBuf))
 			{
@@ -331,7 +344,7 @@ PHP_MINIT_FUNCTION(qcache)
 
 //	qcache_data_shmid = pemalloc(sizeof(int),1);
 
-	//·ÖÅä¹²ÏíÄÚ´æµÃµ½Ò»¸öÈ«¾Ö±êÊ¶
+	//åˆ†é…å…±äº«å†…å­˜å¾—åˆ°ä¸€ä¸ªå…¨å±€æ ‡è¯†
 //	qcache_data_shmid = shmget(IPC_PRIVATE,sizeof(HashTable),IPC_CREAT|IPC_EXCL|0660);
 //	memcpy(qcache_data_shmid, &shmid, sizeof(int));
 	
@@ -403,14 +416,14 @@ PHP_MSHUTDOWN_FUNCTION(qcache)
 /* {{{ PHP_RINIT_FUNCTION(qcache) */
 PHP_RINIT_FUNCTION(qcache)
 {
-	//Ê×ÏÈ»ñÈ¡Êý¾ÝÎÄ¼þ¼ÐµÄÏà¹ØÄ¿Â¼
+	//é¦–å…ˆèŽ·å–æ•°æ®æ–‡ä»¶å¤¹çš„ç›¸å…³ç›®å½•
 	const char *data_path = NULL;
 
 	if(QCACHE_G(data_path)) 
 	{
 		data_path = QCACHE_G(data_path);
 	}
-	//»ñÈ¡¸ÃÎÄ¼þ¼ÐµÄ×´Ì¬ÐÅÏ¢£¬Ö÷ÒªÊÇ×î½üÐÞ¸ÄÊ±¼ä
+	//èŽ·å–è¯¥æ–‡ä»¶å¤¹çš„çŠ¶æ€ä¿¡æ¯ï¼Œä¸»è¦æ˜¯æœ€è¿‘ä¿®æ”¹æ—¶é—´
 	struct stat statBuf;
 	if (stat(data_path, &statBuf))
 	{
@@ -422,7 +435,7 @@ PHP_RINIT_FUNCTION(qcache)
 	if(dif > 0){
 		qcache_parser_ctxt ctxt = {0,};
 		//zend_hash_destroy(qcache_data_hash);
-		//ÖØÐÂ¼ÓÔØÊý¾Ýµ½qcache_data_hash
+		//é‡æ–°åŠ è½½æ•°æ®åˆ°qcache_data_hash
 		qcache_read_data(&ctxt TSRMLS_CC);
 	}
 	return SUCCESS;
@@ -549,23 +562,33 @@ PHP_FUNCTION(qcache_fetch_child)
 
 	src = hentry[0];
 
-	if (child_name && zend_hash_find(Z_ARRVAL_P(src), child_name, child_name_len + 1, (void**)&zvalue) == FAILURE) {
+	//åˆ¤æ–­ç´¢å¼•æ˜¯å¦ä¸ºæ•°å­—
+        bool re = checkInt(child_name);
+	if(child_name && re == false){
+		if (zend_hash_find(Z_ARRVAL_P(src), child_name, child_name_len + 1, (void**)&zvalue) == FAILURE) {
+			RETURN_NULL();
+	  	}
+	}else if(child_name && re == true){
+		if (zend_hash_index_find(Z_ARRVAL_P(src), atoi(child_name), (void**)&zvalue) == FAILURE) {
+			RETURN_NULL();
+	  	}
+	}else{
 		RETURN_NULL();
-  }
+	}
 	*return_value = **zvalue;
-  zval_copy_ctor(return_value);
+  	zval_copy_ctor(return_value);
 }
 
 /* }}} */
 
 /* {{{ proto FrozenArray qcache_reload()
- * ÖØÐÂ¼ÓÔØÊý¾Ýµ½qcache_data_hashÖÐ
+ * é‡æ–°åŠ è½½æ•°æ®åˆ°qcache_data_hashä¸­
  */
 PHP_FUNCTION(qcache_reload) 
 {
 	qcache_parser_ctxt ctxt = {0,};
 	//zend_hash_destroy(qcache_data_hash);
-	//ÖØÐÂ¼ÓÔØÊý¾Ýµ½qcache_data_hash
+	//é‡æ–°åŠ è½½æ•°æ®åˆ°qcache_data_hash
 	qcache_read_data(&ctxt TSRMLS_CC);
 	return SUCCESS;
 }
@@ -579,3 +602,4 @@ PHP_FUNCTION(qcache_reload)
  * vim>600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
+
