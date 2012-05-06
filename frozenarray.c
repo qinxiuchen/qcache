@@ -1033,7 +1033,6 @@ zval* frozen_array_unserialize(const char* filename TSRMLS_DC)
 	FILE *fp;
 	php_unserialize_data_t var_hash;
 	HashTable class_table = {0,};
-	HashTable *orig_class_table = NULL;
 
 	if(VCWD_STAT(filename, &sb) == -1) 
 	{
@@ -1058,16 +1057,6 @@ zval* frozen_array_unserialize(const char* filename TSRMLS_DC)
 
 	PHP_VAR_UNSERIALIZE_INIT(var_hash);
 
-	zend_hash_init_ex(&class_table, 10, NULL, ZEND_CLASS_DTOR, 1, 0);
-
-	/* we have to do this because unserialize() calls zend_lookup_class
-	 * which fails to check for EG(class_table) & segfaults directly. 
-	 */
-	orig_class_table = EG(class_table);
-	EG(class_table) = &class_table;
-	zend_objects_store_init(&EG(objects_store), 1024);
-	
-	/* I wish I could use json */
 	if(!php_var_unserialize(&data, (const unsigned char**)&tmp, contents+len, &var_hash TSRMLS_CC))
 	{
 		zval_ptr_dtor(&data);
@@ -1081,12 +1070,6 @@ zval* frozen_array_unserialize(const char* filename TSRMLS_DC)
 	retval = frozen_array_copy_zval_ptr(NULL, data, 1, NULL TSRMLS_CC);
 
 	zval_ptr_dtor(&data);
-
-	zend_objects_store_free_object_storage(&EG(objects_store) TSRMLS_CC);
-	zend_objects_store_destroy(&EG(objects_store));
-
-	EG(class_table) = orig_class_table;
-	zend_hash_destroy(&class_table);
 
 	free(contents);
 	fclose(fp);
