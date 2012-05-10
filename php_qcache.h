@@ -1,11 +1,10 @@
-
 #ifndef PHP_QCACHE_H
 #define PHP_QCACHE_H
 
 extern zend_module_entry qcache_module_entry;
 #define phpext_qcache_ptr &qcache_module_entry
 
-#define PHP_QCACHE_VERSION "0.1.11"
+#define PHP_QCACHE_VERSION "1.0"
 
 #ifdef PHP_WIN32
 #define PHP_QCACHE_API __declspec(dllexport)
@@ -72,25 +71,31 @@ PHP_MSHUTDOWN_FUNCTION(qcache);
 PHP_RSHUTDOWN_FUNCTION(qcache);
 PHP_MINFO_FUNCTION(qcache);
 
+PHP_FUNCTION(qcache_fetch);
+PHP_FUNCTION(qcache_fetch_child);
+PHP_FUNCTION(qcache_reload);
 
-/* {{{ zend_qcache_globals */
+zval* frozen_array_copy_zval_ptr(zval *dst, zval *src, int persistent);
+void* frozen_array_alloc(size_t size, int persistent);
+HashTable* frozen_array_copy_hashtable(HashTable* dst, HashTable* src, int persistent);
+zval* frozen_array_unserialize(const char* filename);
+
+int qcache_load_data(char *data_file);
+int qcache_walk_dir(char *path, char *ext);
+int qcache_read_data();
+
+
 ZEND_BEGIN_MODULE_GLOBALS(qcache)
-	/* configuration parameters */
-	char *ini_path;		/* search path for ini files */
-	char *data_path;	/* search path for the data files */
-	zval* data_hash;	/* hash storing the data */
+	char *data_path;	/* 存放.data文件的路径 */
 #ifdef ZTS
-	THREAD_T p_tid;		/* thread-id of parent thread */
+	THREAD_T p_tid;		/* 父进程的进程id */
 #else
-	pid_t p_pid;		/* process-id of parent process */
+	pid_t p_pid;		/* 线程id */
 #endif
-	char* per_request_ini; /* per request ini (load at RINIT) */
+	char* per_request_ini; /* 每个进程的请求次数统计 */
 ZEND_END_MODULE_GLOBALS(qcache)
-/* }}} */
 
-/* {{{ extern qcache_globals */
 ZEND_EXTERN_MODULE_GLOBALS(qcache)
-/* }}} */
 
 #ifdef ZTS
 #define QCACHE_G(v) TSRMG(qcache_globals_id, zend_qcache_globals *, v)
@@ -98,14 +103,5 @@ ZEND_EXTERN_MODULE_GLOBALS(qcache)
 #define QCACHE_G(v) (qcache_globals.v)
 #endif
 
-#endif	/* PHP_QCACHE_H */
+#endif
 
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim>600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */
